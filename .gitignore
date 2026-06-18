@@ -1,0 +1,10 @@
+# Sesijski tokeni i osobni/financijski podaci — NIKAD ne commitati
+.env
+data/
+
+# Generirani reporti (sadrže podatke firme)
+report.html
+*.pdf
+*-javna-davanja.html
+*-javna-davanja.csv
+javna-davanja.*
