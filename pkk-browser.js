@@ -1,12 +1,14 @@
 // =============================================================================
 // PKK one-pager — 100% U BROWSERU. Zalijepi u konzolu na stranici ePorezne.
 // =============================================================================
-// 1) Prijavi se: https://upo.porezna-uprava.hr/profil/uvid-u-pkk
+// 1) Prijavi se i odi na: https://upo.porezna-uprava.hr/profil/uvid-u-pkk
 // 2) F12 -> Console -> zalijepi CIJELI ovaj file -> Enter
-// 3) Otvori se report u novom prozoru (gumb „Spremi kao PDF") + download HTML/CSV.
+// 3) Kad skripta zatraži, KLIKNI gumb „Pretraži" na stranici (jednom) — tako
+//    uhvati pristupni token (x-redirect-state) iz tvoje žive sesije.
+// 4) Otvori se report u novom prozoru (gumb „Spremi kao PDF") + download HTML/CSV.
 //
 // Sve ostaje u tvom browseru. Cookie sesije šalje se automatski (isti origin),
-// pa NE treba kopirati nikakav token. Ako dobiješ 401/403, upiši REDIRECT_STATE.
+// token se hvata automatski — NE treba ručno kopirati ništa.
 // =============================================================================
 (async () => {
   // ---- podesivo --------------------------------------------------------------
@@ -21,19 +23,61 @@
   const toEur = (n, g) => (g < EURO_GODINA ? n / HRK_PER_EUR : n);
   const eur = (n) => new Intl.NumberFormat("hr-HR", { style: "currency", currency: "EUR" }).format(n);
   const g0 = (n) => new Intl.NumberFormat("hr-HR", { maximumFractionDigits: 0 }).format(n);
-  const N = (v) => (Number.isFinite(+v) ? +v : 0);
+  // Robustno parsiranje: prihvaća broj (6269.31) i hrvatski string ("6.269,31").
+  // ePorezna ovisno o Accept-Language vraća lokalizirane stringove s zarezom.
+  const N = (v) => {
+    if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+    if (typeof v !== "string" || !/\d/.test(v)) return 0;
+    let t = v.trim().replace(/\s/g, "");
+    const dot = t.includes("."), comma = t.includes(",");
+    if (dot && comma) t = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+    else if (comma) t = t.replace(",", ".");
+    const n = Number(t);
+    return Number.isFinite(n) ? n : 0;
+  };
   const pad2 = (n) => String(n).padStart(2, "0");
   const datum = (y) => { const d = new Date(); return y < d.getFullYear() ? `${y}-12-31` : `${y}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
 
+  let redirectState = REDIRECT_STATE;
   const post = async (endpoint, body) => {
     const res = await fetch(`/api/v1/knjigovodstvo/${endpoint}`, {
       method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "JavaScript", ...(REDIRECT_STATE ? { "x-redirect-state": REDIRECT_STATE } : {}) },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "JavaScript", ...(redirectState ? { "x-redirect-state": redirectState } : {}) },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}` + ([401, 403].includes(res.status) ? " — upiši REDIRECT_STATE na vrhu skripte" : ""));
-    return res.json();
+    if (!res.ok) throw new Error(`HTTP ${res.status}` + ([401, 403].includes(res.status) ? " — sesija je istekla, osvježi stranicu i prijavu" : ""));
+    const j = await res.json();
+    if (j && j.uspjesno === false) throw new Error((j.poruke || []).map((p) => p.opis).join(" ") || "uspjesno=false (nema podataka)");
+    return j;
   };
+
+  // ePorezna API traži header `x-redirect-state` koji SPA dodaje svakom zahtjevu
+  // (nosi kontekst odabranog poreznog obveznika). Iz konzole ga nemamo, pa ga
+  // uhvatimo iz prvog zahtjeva koji SPA pošalje (presreći i fetch i XHR).
+  if (!redirectState) {
+    window.__pkkRS = null;
+    const origFetch = window.fetch;
+    const origSet = XMLHttpRequest.prototype.setRequestHeader;
+    window.fetch = function (u, opt) {
+      try { const rs = new Headers(opt && opt.headers).get("x-redirect-state"); if (rs) window.__pkkRS = rs; } catch (e) {}
+      return origFetch.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.setRequestHeader = function (k, v) {
+      if (String(k).toLowerCase() === "x-redirect-state" && v) window.__pkkRS = v;
+      return origSet.apply(this, arguments);
+    };
+    console.log("%c👉 KLIKNI gumb „Pretraži\" na stranici (jednom) — hvatam pristupni token…", "color:#06c;font-weight:bold;font-size:13px");
+    redirectState = await new Promise((resolve) => {
+      let n = 0; const iv = setInterval(() => {
+        if (window.__pkkRS) { clearInterval(iv); resolve(window.__pkkRS); }
+        else if (++n > 120) { clearInterval(iv); resolve(""); } // ~60 s
+      }, 500);
+    });
+    window.fetch = origFetch;
+    XMLHttpRequest.prototype.setRequestHeader = origSet;
+    if (redirectState) console.log("✓ Token uhvaćen — nastavljam dohvat.");
+    else { console.error("✗ Nisam uhvatio token za 60 s. Pokreni skriptu ponovno pa klikni „Pretraži\", ili upiši REDIRECT_STATE na vrhu (DevTools → Network → bilo koji pkk- zahtjev → Headers → x-redirect-state)."); return; }
+  }
 
   // ---- šifarnik (sifra -> puniNaziv) -----------------------------------------
   const codebook = new Map();

@@ -17,15 +17,21 @@ vanjski server.
 Najjednostavnije: pokreni u konzoli na stranici ePorezne. Kolačić prijave šalje
 se automatski (isti origin), pa **ne treba kopirati nikakav token**.
 
-1. Prijavi se: **https://upo.porezna-uprava.hr/profil/uvid-u-pkk** (NIAS).
+1. Prijavi se i odi na: **https://upo.porezna-uprava.hr/profil/uvid-u-pkk** (NIAS).
 2. Pritisni **F12** → tab **Console**.
 3. Otvori [`pkk-browser.js`](./pkk-browser.js), kopiraj **cijeli** sadržaj,
    zalijepi u konzolu, **Enter**.
-4. Otvori se report u novom prozoru → gumb **„Spremi kao PDF"**. Usput se
+4. Kad skripta to zatraži, **klikni gumb „Pretraži"** na stranici (jednom) — tako
+   automatski uhvati pristupni token iz tvoje sesije.
+5. Otvori se report u novom prozoru → gumb **„Spremi kao PDF"**. Usput se
    preuzmu i HTML i CSV.
 
 Naziv firme i raspon godina podesi na vrhu skripte (`FIRMA`, `POCETNA_GODINA`).
-Kod greške HTTP 401/403 vidi [Često postavljana pitanja](#cesto).
+Vidi [Često postavljana pitanja](#cesto) za probleme s pristupom.
+
+> Zašto klik na „Pretraži"? ePorezna svakom zahtjevu dodaje header
+> `x-redirect-state` (kontekst odabranog obveznika). Skripta ga uhvati iz tvog
+> klika — bez toga server vrati „nemate pristup ovoj funkcionalnosti".
 
 > Zašto baš konzola, a ne web-stranica? Vanjska stranica ne može dohvatiti PKK
 > zbog CORS-a i cross-site kolačića — to je sigurnosna granica browsera. Skripta
@@ -71,10 +77,14 @@ Razrada po vrsti prihoda koristi šifarnik `pkk-dohvati-sifarnik-placanja`
 <a name="cesto"></a>
 ## Često postavljana pitanja
 
-**HTTP 401 / 403?** Sesija je istekla ili portal traži `x-redirect-state`.
-- Browser: kopiraj header `x-redirect-state` iz Network taba (bilo koji `pkk-`
-  zahtjev → Headers) i upiši u `REDIRECT_STATE` na vrhu `pkk-browser.js`.
-- Node: osvježi `PKK_SESSION` i `PKK_REDIRECT_STATE` u `.env`.
+**„Nemate pristup ovoj funkcionalnosti" / svi brojevi nula?** Zahtjevu je
+nedostajao `x-redirect-state`. U browseru: kad skripta to zatraži, **klikni
+„Pretraži"** da ga uhvati. Ako i dalje ne ide, kopiraj header `x-redirect-state`
+iz Network taba (bilo koji `pkk-` zahtjev → Headers) i upiši u `REDIRECT_STATE`
+na vrhu `pkk-browser.js`. (Provjeri i da si gore-desno odabrao pravog obveznika.)
+
+**HTTP 401 / 403?** Sesija je istekla — osvježi stranicu i ponovi prijavu.
+U Node CLI osvježi `PKK_SESSION` i `PKK_REDIRECT_STATE` u `.env`.
 
 **Pop-up blokiran?** Skripta tada preuzme HTML report — otvori ga i Cmd/Ctrl+P → Spremi kao PDF.
 
