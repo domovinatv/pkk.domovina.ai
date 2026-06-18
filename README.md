@@ -33,6 +33,16 @@ Vidi [Često postavljana pitanja](#cesto) za probleme s pristupom.
 > `x-redirect-state` (kontekst odabranog obveznika). Skripta ga uhvati iz tvog
 > klika — bez toga server vrati „nemate pristup ovoj funkcionalnosti".
 
+### Vizualni vodič
+
+**Korak 1 — zalijepi kod u Console (F12) i pritisni Enter:**
+
+![Zalijepi kod u konzolu](docs/01-zalijepi-kod.png)
+
+**Korak 2 — klikni „Pretraži" da skripta uhvati token i povuče podatke:**
+
+![Klikni Pretraži](docs/02-klikni-pretrazi.png)
+
 > Zašto baš konzola, a ne web-stranica? Vanjska stranica ne može dohvatiti PKK
 > zbog CORS-a i cross-site kolačića — to je sigurnosna granica browsera. Skripta
 > u konzoli radi jer se izvršava na samoj ePorezna domeni.
